@@ -1,0 +1,1 @@
+gcc -o mqtt mqtt_client.c -lmosquitto
