@@ -17,16 +17,39 @@
 #include "config.h"
 #include <openthread/dataset.h>
 
-LOG_MODULE_REGISTER(cli_sample, CONFIG_OT_COMMAND_LINE_INTERFACE_LOG_LEVEL);
+// LOG_MODULE_REGISTER(cli_sample, CONFIG_OT_COMMAND_LINE_INTERFACE_LOG_LEVEL);
 
 struct k_timer my_timer;
 
 /* sending data to backend server every 2 seconds */
 void timer_handler();
 
+/* debugging */
+void print_dataset();
+
+/* setting mode for router */
+void set_mode();
+
+uint32_t DefaultJoinerTimeout = 120; ///< Default timeout for Joiners, in seconds.
 
 /* define an instance of thread */
 otInstance *instance;
+
+/* set up for dataset */
+otOperationalDataset Dataset;	
+
+K_TIMER_DEFINE(my_timer,timer_handler,NULL);
+
+otCommissionerStateCallback commission_handler(otCommissionerState aState, void *aContext) {
+	if (aState == OT_COMMISSIONER_STATE_ACTIVE) {
+		printk("successful\n");
+	} else {
+		printk("patience\n");
+	}
+
+}
+
+
 
 void main(void)
 {
@@ -51,53 +74,106 @@ void main(void)
 	//Error
 	otError err;
 
-	//set up for router
-	otOperationalDataset *Dataset = malloc(sizeof(otOperationalDataset));	
+	//set mode
+	set_mode();
 
-	//1. initialise dataset
-	err = otDatasetCreateNewNetwork(instance, Dataset);
-
-	//commit dataset
-	err = otDatasetSetActive(instance, Dataset);
-	
-	//2. hardcode a masterkey/networkkey 537df8da171e038eb120bc98b7f790c0
-	err = otThreadSetMasterKey(instance,"537df8da171e038eb120bc98b7f790c0");
+	//initialise dataset
+	err = otDatasetCreateNewNetwork(instance, &Dataset);
 
 	//commit dataset
-	err = otDatasetSetActive(instance, Dataset);
+	err = otDatasetSetActive(instance, &Dataset);
 	
-	//3. set up ifconfig	
+	if (err == OT_ERROR_NONE) {
+		printk("successful \n");
+	}
+	
+	//set up ifconfig	
 	err = otIp6SetEnabled(instance, true);
 
-	//4. set up thread
+	//set up thread
 	err = otThreadSetEnabled(instance, true);
 
+	// //manually do in-band commissioning
+	// while (otCommissionerStart(instance,NULL,NULL,NULL) != OT_ERROR_NONE) {	
+	// 	err = otCommissionerStop(instance);
+	// }
+
+	// //commit dataset
+	// err = otDatasetSetActive(instance, &Dataset);
+
+	
+	// if (OT_COMMISSIONER_STATE_ACTIVE != otCommissionerGetState(instance)) {
+	// 	printk("why \n");
+	// }
+
+
+
 	//start the timer for 2 second
-	k_timer_start(&my_timer, K_SECONDS(2), K_SECONDS(2));
+	// k_timer_start(&my_timer, K_SECONDS(10), K_SECONDS(10));
 
 }
 
 void timer_handler() {
-	//check state of thread
-	otDeviceRole role = otThreadGetDeviceRole(instance);
-	otRouterInfo parentInfo;
-	otError error;
-	
-	//storing rssi value
-	int8_t aLastRssi;
-	int8_t aParentRssi;
-
-	//all child will send to server
-	if (role == OT_DEVICE_ROLE_CHILD) {
-		if (otThreadGetParentInfo(instance, &parentInfo) == OT_ERROR_NONE && parentInfo.mLinkEstablished == true) {
-			//rssi value obtained directly
-			// error = otThreadGetParentLastRssi(instance,&aLastRssi);
-			// error = otThreadGetParentAverageRssi(instance,&aParentRssi);
+	//print_dataset();
+}
 
 
-		} 
-	}
 
+void print_dataset() {
+   if (Dataset.mComponents.mIsPendingTimestampPresent)
+    {
+        printk("Pending Timestamp: %lu", Dataset.mPendingTimestamp);
+    }
+
+    if (Dataset.mComponents.mIsActiveTimestampPresent)
+    {
+        printk("Active Timestamp: %lu", Dataset.mActiveTimestamp);
+    }
+
+    if (Dataset.mComponents.mIsChannelPresent)
+    {
+        printk("Channel: %d", Dataset.mChannel);
+    }
+
+    if (Dataset.mComponents.mIsChannelMaskPresent)
+    {
+        printk("Channel Mask: 0x%08x", Dataset.mChannelMask);
+    }
+
+    if (Dataset.mComponents.mIsDelayPresent)
+    {
+        printk("Delay: %d", Dataset.mDelay);
+    }
+
+    if (Dataset.mComponents.mIsMasterKeyPresent)
+    {
+        printk("Master Key: ");
+        printk("%x\n",Dataset.mMasterKey.m8);
+        printk("\n");
+    }
+
+    if (Dataset.mComponents.mIsNetworkNamePresent)
+    {
+        printk("Network Name: ");
+        printk("%s", Dataset.mNetworkName.m8);
+    }
+
+    if (Dataset.mComponents.mIsPanIdPresent)
+    {
+        printk("PAN ID: 0x%04x", Dataset.mPanId);
+    }
+
+}
+
+void set_mode() {
+	otLinkModeConfig linkMode;
+
+	/* rdn */
+	linkMode.mRxOnWhenIdle = true;
+	linkMode.mDeviceType = true;
+	linkMode.mNetworkData = true;
+
+	otThreadSetLinkMode(instance,linkMode);
 }
 
 

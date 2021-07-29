@@ -11,4 +11,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(openthread_cli)
 
-target_sources(app PRIVATE src/main.c src/config.h)
+target_sources(app PRIVATE src/main.c)
+
+FILE(GLOB core_sources /src/*.c)
+target_sources(app PRIVATE ${core_sources})
+target_include_directories(app PRIVATE /src)
